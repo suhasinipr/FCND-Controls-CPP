@@ -18,6 +18,7 @@ void QuadControl::Init()
 
   // variables needed for integral control
   integratedAltitudeError = 0;
+  prevYawError = 0;
     
 #ifndef __PX4_NUTTX
   // Load params from simulator parameter system
@@ -45,6 +46,8 @@ void QuadControl::Init()
 
   minMotorThrust = config->Get(_config + ".minMotorThrust", 0);
   maxMotorThrust = config->Get(_config + ".maxMotorThrust", 100);
+
+  
 #else
   // load params from PX4 parameter system
   //TODO
@@ -78,10 +81,10 @@ VehicleCommand QuadControl::GenerateMotorCommands(float collThrustCmd, V3F momen
 	//cmd.desiredThrustsN[2] = mass * 9.81f / 4.f; // rear left
 	//cmd.desiredThrustsN[3] = mass * 9.81f / 4.f; // rear right
 
-	cmd.desiredThrustsN[0] = (collThrustCmd + mom_x + mom_y + mom_z) / 4.0f; //front left
-	cmd.desiredThrustsN[1] = (collThrustCmd - mom_x + mom_y - mom_z) / 4.0f;// front right
-	cmd.desiredThrustsN[2] = (collThrustCmd - mom_x - mom_y + mom_z) / 4.0f;// rear left
-	cmd.desiredThrustsN[3] = (collThrustCmd + mom_x - mom_y - mom_z) / 4.0f;// rear right
+	cmd.desiredThrustsN[0] = (collThrustCmd + mom_x + mom_y - mom_z) / 4.0f; //front left
+	cmd.desiredThrustsN[1] = (collThrustCmd - mom_x + mom_y + mom_z) / 4.0f;// front right
+	cmd.desiredThrustsN[2] = (collThrustCmd + mom_x - mom_y + mom_z) / 4.0f;// rear left
+	cmd.desiredThrustsN[3] = (collThrustCmd - mom_x - mom_y - mom_z) / 4.0f;// rear right
  
 
   /////////////////////////////// END STUDENT CODE ////////////////////////////
@@ -138,7 +141,11 @@ V3F QuadControl::RollPitchControl(V3F accelCmd, Quaternion<float> attitude, floa
 
   ////////////////////////////// BEGIN STUDENT CODE ///////////////////////////
   float target_r13 = -accelCmd.x * mass / collThrustCmd;
+  target_r13 = target_r13 < -maxTiltAngle ? maxTiltAngle : target_r13;
+  target_r13 = target_r13 > maxTiltAngle ? maxTiltAngle : target_r13;
   float target_r23 = -accelCmd.y * mass / collThrustCmd;
+  target_r23 = target_r23 < -maxTiltAngle ? maxTiltAngle : target_r23;
+  target_r23 = target_r23 > maxTiltAngle ? maxTiltAngle : target_r23;
   float a = kpBank * (target_r13 - R(0, 2));
   float b = kpBank * (target_r23 - R(1, 2));
   pqrCmd.x = ((R(1, 0) * a) - (R(0, 0) * b)) / R(2, 2);
@@ -174,15 +181,18 @@ float QuadControl::AltitudeControl(float posZCmd, float velZCmd, float posZ, flo
 
   ////////////////////////////// BEGIN STUDENT CODE ///////////////////////////
   integratedAltitudeError += (posZCmd - posZ) * dt;
+  velZCmd = velZCmd > maxAscentRate ? maxAscentRate : velZCmd;
+  velZCmd = velZCmd < -maxDescentRate ? -maxDescentRate : velZCmd;
   float u_bar = kpPosZ * (posZCmd - posZ) + kpVelZ * (velZCmd - velZ) + accelZCmd + KiPosZ * integratedAltitudeError;
 
-  thrust = u_bar * mass / R(2,2) ;
+  thrust = -u_bar * mass / R(2,2) ;
 
-  thrust > maxMotorThrust? maxMotorThrust : thrust;
+  thrust = thrust > maxMotorThrust? maxMotorThrust : thrust;
 
+  //thrust = mass * 9.81; //temporary
   /////////////////////////////// END STUDENT CODE ////////////////////////////
   
-  return -thrust;
+  return thrust;
 }
 
 // returns a desired acceleration in global frame
@@ -211,6 +221,9 @@ V3F QuadControl::LateralPositionControl(V3F posCmd, V3F velCmd, V3F pos, V3F vel
   V3F horizAccel;
   ////////////////////////////// BEGIN STUDENT CODE ///////////////////////////
 
+  velCmd.x = velCmd.x > maxSpeedXY ? maxSpeedXY : velCmd.x;
+  velCmd.y = velCmd.y > maxSpeedXY ? maxSpeedXY : velCmd.y;
+
   horizAccel = kpPosXY * (posCmd - pos) + kpVelXY * (velCmd - vel) + accelCmd;
   
   accelCmd.x = horizAccel.x > maxAccelXY ? maxAccelXY : horizAccel.x;
@@ -234,10 +247,13 @@ float QuadControl::YawControl(float yawCmd, float yaw)
   //  - use the yaw control gain parameter kpYaw
 
   float yawRateCmd=0;
+  float kd_yaw = 1;
   ////////////////////////////// BEGIN STUDENT CODE ///////////////////////////
 
-  yawCmd = fmodf(yawCmd,2*3.14);
-  yawRateCmd = kpYaw * ( yawCmd - yaw);
+  //yawCmd = fmodf(yawCmd,2*3.14);
+  float yaw_error = (yawCmd - yaw);
+
+  yawRateCmd = kpYaw * ( yawCmd - yaw) + kd_yaw * (yaw_error-prevYawError);
 
   /////////////////////////////// END STUDENT CODE ////////////////////////////
 
