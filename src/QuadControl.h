@@ -4,6 +4,8 @@
 #include "Utility/StringUtils.h"
 #include "Trajectory.h"
 #include "BaseController.h"
+#include <iostream>
+#include <fstream>
 
 class QuadControl : public BaseController
 {
@@ -50,4 +52,9 @@ public:
   float integratedAltitudeError;
 
   float prevYawError;
+
+  //Logging
+  string logFileName;
+  ofstream LogStream;
+  string intro;
 };

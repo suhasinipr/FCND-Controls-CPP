@@ -128,6 +128,7 @@ int QuadDynamics::Initialize()
 
 void QuadDynamics::Run(float dt, float simulationTime, int &idum, V3F externalForceInGlobalFrame, V3F externalMomentInBodyFrame)
 {
+
 	if (dt <= 0 || dt>0.05 || _isnan(dt))
 	{
 		printf("Something is wrong with dt: %lf", dt);
