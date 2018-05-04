@@ -305,7 +305,7 @@ float QuadControl::AltitudeControl(float posZCmd, float velZCmd, float posZ, flo
 #endif
   float u_bar = kpPosZ * (posZCmd - posZ) + kpVelZ * (velZCmd - velZ) + accelZCmd + KiPosZ * integratedAltitudeError;
 
-  thrust = CONST_GRAVITY-u_bar * mass / R(2,2) ;
+  thrust = (CONST_GRAVITY-u_bar) * mass / R(2,2) ;
 #if AltitudeControl_LOGGING == 1 
 
   LogStream << "Thrust before bounding: " << thrust <<"\n";
