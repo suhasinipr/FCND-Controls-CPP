@@ -12,7 +12,7 @@
 #define MOTOR_COMMANDS_LOGGING 0
 #define BodyRateControl_LOGGING 0
 #define RollPitchControl_LOGGING 0
-#define AltitudeControl_LOGGING 1
+#define AltitudeControl_LOGGING 0
 #define LateralPositionControl_LOGGING 0
 #define YawControl_LOGGING 0
 
@@ -20,7 +20,7 @@
 #define SCENARIO_2_1 1
 #define SCENARIO_2_2 1
 #define SCENARIO_3_1 1
-#define SCENARIO_3_2 0
+#define SCENARIO_3_2 1
 #define SCENARIO_4 0
 
 #ifdef __PX4_NUTTX
@@ -37,7 +37,7 @@ void QuadControl::Init()
 
   //Logging
 #if (MOTOR_COMMANDS_LOGGING == 1 || BodyRateControl_LOGGING == 1 || RollPitchControl_LOGGING ==1 || AltitudeControl_LOGGING == 1 || LateralPositionControl_LOGGING == 1 || YawControl_LOGGING == 1)
-  logFileName = "Logs\\Log_5.txt";
+  logFileName = "Logs\\Log_6.txt";
   intro = "-----------------SCENARIO_3-------------\n --------------------------------\n";
   LogStream.open(logFileName, ios::out | ios::app);
   LogStream << intro;
@@ -113,7 +113,7 @@ VehicleCommand QuadControl::GenerateMotorCommands(float collThrustCmd, V3F momen
 	float l = L / sqrt(2);
 	float mom_x = momentCmd.x / L;
 	float mom_y = momentCmd.y / L;
-	float mom_z = momentCmd.z / -kappa;
+	float mom_z = momentCmd.z / kappa;
 	float F1, F2, F3, F4;
 #if SCENARIO_1 == 1
 	F1 = mass * 9.81f / 4.f; // front left
@@ -221,22 +221,32 @@ V3F QuadControl::RollPitchControl(V3F accelCmd, Quaternion<float> attitude, floa
   LogStream << "CollThrust: " << collThrustCmd << "\n";
   LogStream << "kpBank: " << kpBank << "\n";
 #endif
-  float target_r13 = -accelCmd.x * mass / collThrustCmd;
-  LogStream << "Temp variables: ";
-  LogStream << "Target r_13 before bounding: " << target_r13 << ", ";
-  target_r13 = target_r13 < -maxTiltAngle ? maxTiltAngle : target_r13;
-  target_r13 = target_r13 > maxTiltAngle ? maxTiltAngle : target_r13;
-  LogStream << "Target r_13 after bounding: " << target_r13 << ", ";
-  float target_r23 = -accelCmd.y * mass / collThrustCmd;
-  LogStream << "Target r_23 before bounding: " << target_r23<< ", ";
-  target_r23 = target_r23 < -maxTiltAngle ? maxTiltAngle : target_r23;
-  target_r23 = target_r23 > maxTiltAngle ? maxTiltAngle : target_r23;
-  LogStream << "Target r_23 after bounding: " << target_r23 << "\n";
-  float a = kpBank * (target_r13 - R(0, 2));
-  float b = kpBank * (target_r23 - R(1, 2));
-  pqrCmd.x = ((R(1, 0) * a) - (R(0, 0) * b)) / R(2, 2);
-  pqrCmd.y = ((R(1, 1) * a) - (R(0, 1) * b)) / R(2, 2);
-  pqrCmd.z = 0;
+  if (collThrustCmd > 0)
+  {
+	  float target_r13 = -accelCmd.x * mass / collThrustCmd;
+	  LogStream << "Temp variables: ";
+	  LogStream << "Target r_13 before bounding: " << target_r13 << ", ";
+	  target_r13 = target_r13 < -maxTiltAngle ? maxTiltAngle : target_r13;
+	  target_r13 = target_r13 > maxTiltAngle ? maxTiltAngle : target_r13;
+	  LogStream << "Target r_13 after bounding: " << target_r13 << ", ";
+	  float target_r23 = -accelCmd.y * mass / collThrustCmd;
+	  LogStream << "Target r_23 before bounding: " << target_r23 << ", ";
+	  target_r23 = target_r23 < -maxTiltAngle ? maxTiltAngle : target_r23;
+	  target_r23 = target_r23 > maxTiltAngle ? maxTiltAngle : target_r23;
+	  LogStream << "Target r_23 after bounding: " << target_r23 << "\n";
+	  float a = kpBank * (target_r13 - R(0, 2));
+	  float b = kpBank * (target_r23 - R(1, 2));
+	  pqrCmd.x = ((R(1, 0) * a) - (R(0, 0) * b)) / R(2, 2);
+	  pqrCmd.y = ((R(1, 1) * a) - (R(0, 1) * b)) / R(2, 2);
+	  pqrCmd.z = 0;
+  }
+  else
+  {
+	  pqrCmd.x = 0;
+	  pqrCmd.y = 0;
+	  pqrCmd.z = 0;
+  }
+  
   /////////////////////////////// END STUDENT CODE ////////////////////////////
 #if RollPitchControl_LOGGING == 1
   LogStream << "Outputs: \n";
@@ -409,7 +419,7 @@ float QuadControl::YawControl(float yawCmd, float yaw)
   //  - use the yaw control gain parameter kpYaw
 
   float yawRateCmd=0;
-  float kd_yaw = 1;
+  float kd_yaw = 15;
   ////////////////////////////// BEGIN STUDENT CODE ///////////////////////////
 #if YawControl_LOGGING == 1
   LogStream.open(logFileName, ios::out | ios::app);
@@ -418,13 +428,30 @@ float QuadControl::YawControl(float yawCmd, float yaw)
   LogStream << "yawCmd: " << yawCmd << "\n";
   LogStream << "yaw: " << yaw << "\n";
   LogStream << "kpYaw: " << kpYaw << "\n";
+  
 #endif
 
-  //yawCmd = fmodf(yawCmd,2*3.14);
+ // yawCmd = fmodf(yawCmd,2*3.14);
   float yaw_error = (yawCmd - yaw);
+//  float yaw_error = (yawCmd - yaw);
+#if YawControl_LOGGING == 1
+  
+  LogStream << "yawCmd after bounding: " << yawCmd << "\n";
+  LogStream << "yawerror: " << yaw_error << "\n";
+  LogStream << "prevYawError: " << prevYawError << "\n";
 
-  yawRateCmd = kpYaw * ( yawCmd - yaw) + kd_yaw * (yaw_error-prevYawError);
+#endif
+  if (yaw_error > 3.14)
+  yaw_error = yaw_error - 2.0 * 3.14;
+  else if (yaw_error < -3.14)
+  yaw_error = yaw_error + 2.0 * 3.14;
 
+#if YawControl_LOGGING == 1
+  LogStream << "yawerror after bounding: " << yaw_error << "\n";
+ #endif
+  //yawRateCmd = kpYaw * ( yaw_error) + kd_yaw * (prevYawError - yaw_error);
+  yawRateCmd = kpYaw * yaw_error;
+  prevYawError = yaw_error;
   /////////////////////////////// END STUDENT CODE ////////////////////////////
 #if YawControl_LOGGING == 1
   LogStream << "Outputs: \n";
