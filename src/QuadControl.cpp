@@ -221,32 +221,25 @@ V3F QuadControl::RollPitchControl(V3F accelCmd, Quaternion<float> attitude, floa
   LogStream << "CollThrust: " << collThrustCmd << "\n";
   LogStream << "kpBank: " << kpBank << "\n";
 #endif
-  if (collThrustCmd > 0)
-  {
-	  float target_r13 = -accelCmd.x * mass / collThrustCmd;
-	  LogStream << "Temp variables: ";
-	  LogStream << "Target r_13 before bounding: " << target_r13 << ", ";
-	  target_r13 = target_r13 < -maxTiltAngle ? maxTiltAngle : target_r13;
-	  target_r13 = target_r13 > maxTiltAngle ? maxTiltAngle : target_r13;
-	  LogStream << "Target r_13 after bounding: " << target_r13 << ", ";
-	  float target_r23 = -accelCmd.y * mass / collThrustCmd;
-	  LogStream << "Target r_23 before bounding: " << target_r23 << ", ";
-	  target_r23 = target_r23 < -maxTiltAngle ? maxTiltAngle : target_r23;
-	  target_r23 = target_r23 > maxTiltAngle ? maxTiltAngle : target_r23;
-	  LogStream << "Target r_23 after bounding: " << target_r23 << "\n";
-	  float a = kpBank * (target_r13 - R(0, 2));
-	  float b = kpBank * (target_r23 - R(1, 2));
-	  pqrCmd.x = ((R(1, 0) * a) - (R(0, 0) * b)) / R(2, 2);
-	  pqrCmd.y = ((R(1, 1) * a) - (R(0, 1) * b)) / R(2, 2);
-	  pqrCmd.z = 0;
-  }
-  else
-  {
-	  pqrCmd.x = 0;
-	  pqrCmd.y = 0;
-	  pqrCmd.z = 0;
-  }
+
+	float target_r13 = accelCmd.x * mass / collThrustCmd;
+	LogStream << "Temp variables: ";
+	LogStream << "Target r_13 before bounding: " << target_r13 << ", ";
+	target_r13 = -CONSTRAIN(target_r13, -maxTiltAngle, maxTiltAngle);
+	LogStream << "Target r_13 after bounding: " << target_r13 << ", ";
+	float target_r23 = accelCmd.y * mass / collThrustCmd;
+	LogStream << "Target r_23 before bounding: " << target_r23 << ", ";
+	target_r23 = -CONSTRAIN(target_r23, -maxTiltAngle, maxTiltAngle);
+	  
+	LogStream << "Target r_23 after bounding: " << target_r23 << "\n";
+	float a = kpBank * (target_r13 - R(0, 2));
+	float b = kpBank * (target_r23 - R(1, 2));
+	pqrCmd.x = ((R(1, 0) * a) - (R(1, 1) * b)) / R(2, 2);
+	pqrCmd.y = ((R(0, 0) * a) - (R(0, 1) * b)) / R(2, 2);
+	pqrCmd.z = 0;
   
+ 
+
   /////////////////////////////// END STUDENT CODE ////////////////////////////
 #if RollPitchControl_LOGGING == 1
   LogStream << "Outputs: \n";
@@ -419,7 +412,7 @@ float QuadControl::YawControl(float yawCmd, float yaw)
   //  - use the yaw control gain parameter kpYaw
 
   float yawRateCmd=0;
-  float kd_yaw = 15;
+
   ////////////////////////////// BEGIN STUDENT CODE ///////////////////////////
 #if YawControl_LOGGING == 1
   LogStream.open(logFileName, ios::out | ios::app);
@@ -449,7 +442,7 @@ float QuadControl::YawControl(float yawCmd, float yaw)
 #if YawControl_LOGGING == 1
   LogStream << "yawerror after bounding: " << yaw_error << "\n";
  #endif
-  //yawRateCmd = kpYaw * ( yaw_error) + kd_yaw * (prevYawError - yaw_error);
+
   yawRateCmd = kpYaw * yaw_error;
   prevYawError = yaw_error;
   /////////////////////////////// END STUDENT CODE ////////////////////////////
